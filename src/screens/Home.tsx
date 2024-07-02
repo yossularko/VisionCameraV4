@@ -20,7 +20,7 @@ const Home = ({navigation}: Props) => {
           onPress={() => navigation.navigate('TakingPhoto')}
         />
         <Button
-          title="Scan QR Code"
+          title="Scan Barcode"
           onPress={() => navigation.navigate('ScanningBarcode')}
         />
         <Button

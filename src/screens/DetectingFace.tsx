@@ -1,7 +1,7 @@
 import {Button, Image, ScrollView, StyleSheet, View} from 'react-native';
 import React, {useState} from 'react';
 import {NativeStackScreenProps} from '@react-navigation/native-stack';
-import {ModalCameraFaceDetection, MyLayout} from '../components';
+import {ModalCameraFaceDetection2, MyLayout} from '../components';
 import {useDisclosure} from '../hooks';
 
 type Props = NativeStackScreenProps<MainStackParamList, 'DetectingFace'>;
@@ -11,7 +11,7 @@ const DetectingFace = ({}: Props) => {
   const {isOpen, onOpen, onClose} = useDisclosure();
   return (
     <MyLayout>
-      <ModalCameraFaceDetection
+      <ModalCameraFaceDetection2
         visible={isOpen}
         onClose={onClose}
         onFound={val => setImage(val)}

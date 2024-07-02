@@ -12,14 +12,20 @@ import {
   Camera,
   CameraRuntimeError,
   useCameraDevice,
-  useCodeScanner,
+  useFrameProcessor,
 } from 'react-native-vision-camera';
 import {myToast} from '../utils/myToast';
+import {
+  Face,
+  FaceDetectionOptions,
+  useFaceDetector,
+} from 'react-native-vision-camera-face-detector';
+import {Worklets} from 'react-native-worklets-core';
 
 interface Props {
   visible: boolean;
   onClose: () => void;
-  onFound: (code: string) => void;
+  onFound: (code: ImageObj) => void;
 }
 
 const invisibleColor = 'rgba(255, 255, 255, 0)';
@@ -33,39 +39,77 @@ const LoadingView = () => {
   );
 };
 
-const ModalCameraCodeScanner = ({visible, onClose, onFound}: Props) => {
-  const [code, setCode] = useState('');
-  const device = useCameraDevice('back');
+const ModalCameraFaceDetection = ({visible, onClose, onFound}: Props) => {
+  const [isDetected, setIsDetected] = useState(false);
 
-  const codeScanner = useCodeScanner({
-    codeTypes: ['qr', 'ean-13'],
-    onCodeScanned: codes => {
-      if (codes.length > 0) {
-        setCode(codes[0].value || '');
-      }
-    },
+  const camera = useRef<Camera>(null);
+  const faceDetectionOptions = useRef<FaceDetectionOptions>({
+    // detection options
+    performanceMode: 'fast',
+  }).current;
+
+  const device = useCameraDevice('front');
+  const {detectFaces} = useFaceDetector(faceDetectionOptions);
+
+  const handleDetectedFaces = Worklets.createRunOnJS((faces: Face[]) => {
+    console.log('faces detected', faces);
+    if (faces.length === 0) {
+      setIsDetected(false);
+    } else {
+      setIsDetected(true);
+    }
   });
+
+  const frameProcessor = useFrameProcessor(
+    frame => {
+      'worklet';
+      const faces = detectFaces(frame);
+      // ... chain frame processors
+      // ... do something with frame
+      handleDetectedFaces(faces);
+    },
+    [handleDetectedFaces],
+  );
 
   const onError = useCallback((error: CameraRuntimeError) => {
     console.log('Error Camera: ', error);
     myToast(error.message);
   }, []);
 
-  const findQrCode = useRef<(code: string) => void>(() => {});
-  findQrCode.current = qrcode => {
-    onFound(qrcode);
-    onClose();
+  const takePic = useRef(async () => {});
+  takePic.current = async () => {
+    try {
+      const photo = await camera.current?.takePhoto({
+        enableShutterSound: false,
+      });
+
+      if (photo) {
+        const {path} = photo;
+        const namaFile = path.substring(path.lastIndexOf('/') + 1, path.length);
+
+        const dataPhoto = {
+          uri: `file://${path}`,
+          name: namaFile,
+          type: 'image/jpeg',
+        };
+
+        onFound(dataPhoto);
+        onClose();
+      }
+    } catch (err: any) {
+      console.log('error capture: ', String(err));
+    }
   };
 
   useEffect(() => {
-    if (visible && code) {
-      findQrCode.current(code);
+    if (isDetected) {
+      takePic.current();
     }
-  }, [visible, code]);
+  }, [isDetected]);
 
   useEffect(() => {
     if (!visible) {
-      setCode('');
+      setIsDetected(false);
     }
   }, [visible]);
 
@@ -87,16 +131,18 @@ const ModalCameraCodeScanner = ({visible, onClose, onFound}: Props) => {
           />
           <View style={styles.cameraContainer}>
             <Camera
+              ref={camera}
               style={{aspectRatio: 9 / 16}}
               device={device}
-              codeScanner={codeScanner}
               isActive={visible}
+              frameProcessor={frameProcessor}
+              photo={true}
               onError={onError}
             />
           </View>
           <View style={styles.container}>
             <View style={styles.actionSection}>
-              <Text style={{marginTop: 10}}>Scanning..</Text>
+              <Text style={{marginTop: 10}}>Detecting face..</Text>
             </View>
           </View>
         </View>
@@ -105,7 +151,7 @@ const ModalCameraCodeScanner = ({visible, onClose, onFound}: Props) => {
   );
 };
 
-export default ModalCameraCodeScanner;
+export default ModalCameraFaceDetection;
 
 const ScreenHeight = Dimensions.get('window').height;
 const ScreenWidth = Dimensions.get('window').width;
